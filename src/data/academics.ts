@@ -17,7 +17,7 @@ export type AcademicData = {
   students: AcademicStudent[];
 };
 
-const STORAGE_KEY = "apex.academics.data.v1";
+const STORAGE_KEY = "apex.academics.data.v2";
 
 export const seedAcademicData: AcademicData = {
   classes: [
@@ -26,13 +26,7 @@ export const seedAcademicData: AcademicData = {
     { id: "ECE-A", department: "ECE", section: "A" },
     { id: "EEE-A", department: "EEE", section: "A" },
   ],
-  students: [
-    { id: "stu-001", name: "Arun Kumar", roll: "23CSE001", classId: "CSE-A", status: "active" },
-    { id: "stu-002", name: "Divya S", roll: "23CSE002", classId: "CSE-A", status: "active" },
-    { id: "stu-003", name: "Harish R", roll: "23CSE003", classId: "CSE-A", status: "active" },
-    { id: "stu-004", name: "Keerthana P", roll: "23CSE004", classId: "CSE-A", status: "active" },
-    { id: "stu-005", name: "Manoj K", roll: "23CSE005", classId: "CSE-A", status: "active" },
-  ],
+  students: [],
 };
 
 export function loadAcademicData(): AcademicData {
