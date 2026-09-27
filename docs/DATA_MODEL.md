@@ -95,6 +95,23 @@ Required logical attributes:
 - applicable academic period
 - status
 
+## 2.1 Department and class management
+
+APEX maintains an explicit academic roster so student identity is not hard-coded into the UI.
+
+### Department / Class / Section
+
+A class/section belongs to a department and has a stable class identifier such as `CSE-A`.
+
+The roster management workflow must support:
+- selecting a department/class/section
+- adding an active student with a name and roll number/student ID
+- marking a student inactive without deleting historical attendance
+- creating additional department/section combinations
+- using the same roster as the source for attendance workflows
+
+The current desktop prototype stores this roster locally. A shared database and authenticated student identities remain future implementation work.
+
 ## 3. Attendance domain
 
 ### Attendance Session
