@@ -1,8 +1,9 @@
 import { useMemo, useState, type ReactNode } from "react";
+import qrcode from "qrcode-generator";
 import { getAttendancePercentage, getAttendanceSummary, loadAttendance, saveAttendance, type AttendanceStudent } from "./data/attendance";
 import { getClassLabel, getClassStudents, loadAcademicData, saveAcademicData, type AcademicClass, type AcademicData } from "./data/academics";
 
-type Workspace = "dashboard" | "attendance" | "students" | "spreadsheets" | "messaging" | "reports" | "qr";
+type Workspace = "dashboard" | "attendance" | "students" | "spreadsheets" | "messaging" | "reports" | "qr" | "enroll";
 
 const navItems: Array<{ id: Workspace; label: string }> = [
   { id: "dashboard", label: "Dashboard" },
@@ -24,7 +25,7 @@ function Orb() {
   );
 }
 
-function Icon({ name }: { name: "arrow" | "plus" | "search" | "download" | "send" | "qr" | "sheet" }) {
+function Icon({ name }: { name: "arrow" | "plus" | "search" | "download" | "send" | "qr" | "copy" | "sheet" }) {
   const paths: Record<string, ReactNode> = {
     arrow: <path d="M5 12h14M13 6l6 6-6 6" />,
     plus: <path d="M12 5v14M5 12h14" />,
@@ -32,6 +33,7 @@ function Icon({ name }: { name: "arrow" | "plus" | "search" | "download" | "send
     download: <><path d="M12 4v11M8 11l4 4 4-4" /><path d="M5 20h14" /></>,
     send: <><path d="m4 5 16 7-16 7 3-7-3-7Z" /><path d="M7 12h13" /></>,
     qr: <><path d="M5 5h5v5H5zM14 5h5v5h-5zM5 14h5v5H5z" /><path d="M14 14h3v3h-3zM18 18h1v1h-1z" /></>,
+    copy: <><rect x="8" y="8" width="11" height="11" rx="2" /><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" /></>,
     sheet: <><rect x="5" y="4" width="14" height="16" rx="2" /><path d="M8 8h8M8 12h8M8 16h5" /></>,
   };
   return <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{paths[name]}</svg>;
@@ -355,7 +357,7 @@ function Students({
         eyebrow="STUDENTS & CLASSES"
         title="Class management"
         subtitle="Add your real student roster and organize students by department and section."
-        action={<Button variant="primary" icon="plus" onClick={() => setConfirmAdd(true)}>Add student</Button>}
+        action={<div className="page-actions"><Button icon="qr" onClick={() => setWorkspace("enroll")}>QR enrollment</Button><Button variant="primary" icon="plus" onClick={() => setConfirmAdd(true)}>Add student</Button></div>}
       />
 
       <section className="class-toolbar">
@@ -404,7 +406,10 @@ function Students({
         </div>
 
         <aside className="panel action-panel">
-          <p className="eyebrow">ADD DEPARTMENT / SECTION</p>
+          <p className="eyebrow">ROSTER INPUTS</p>
+          <Button variant="primary" icon="qr" onClick={() => setWorkspace("enroll")}>Add students with QR</Button>
+          <p className="action-description">Generate one temporary enrollment QR for this selected class. Students can scan it from their phones.</p>
+          <p className="eyebrow">ADD DEPARTMENT / SECTION</p
           <label>Department<input className="text-input" value={newDepartment} onChange={(event) => setNewDepartment(event.target.value)} placeholder="e.g. CSE" /></label>
           <label>Section<input className="text-input" value={newSection} onChange={(event) => setNewSection(event.target.value)} placeholder="e.g. A" /></label>
           <Button variant="primary" onClick={addClass}>Create class</Button>
@@ -496,6 +501,74 @@ function Reports({ students }: { students: AttendanceStudent[] }) {
     </>
   );
 }
+function EnrollmentQR({ classId, classes, setWorkspace }: { classId: string; classes: AcademicClass[]; setWorkspace: (workspace: Workspace) => void }) {
+  const [session, setSession] = useState(() => createEnrollmentSession(classId));
+  const selectedClass = classes.find((item) => item.id === session.classId) ?? classes[0];
+  const qrSvg = useMemo(() => {
+    const qr = qrcode(0, "M");
+    qr.addData(session.payload);
+    qr.make();
+    return qr.createSvgTag({ cellSize: 6, margin: 4, scalable: true });
+  }, [session.payload]);
+
+  const regenerate = () => setSession(createEnrollmentSession(classId));
+
+  const copyToken = async () => {
+    await navigator.clipboard.writeText(session.token);
+  };
+
+  return (
+    <>
+      <PageHeader
+        eyebrow="STUDENT ENROLLMENT · QR"
+        title="Add students with QR"
+        subtitle="Generate a temporary enrollment QR for a class. The QR carries only a short-lived enrollment token and class identifier."
+        action={<div className="page-actions"><Button onClick={() => setWorkspace("students")}>Back to students</Button><Button variant="primary" icon="qr" onClick={regenerate}>New QR</Button></div>}
+      />
+      <section className="qr-layout enrollment-layout">
+        <div className="panel session-panel enrollment-session">
+          <p className="eyebrow">ENROLLMENT QR</p>
+          <div className="enrollment-class">
+            <span>Class</span>
+            <strong>{selectedClass ? selectedClass.department + " · " + selectedClass.section : session.classId}</strong>
+          </div>
+          <div className="enrollment-qr" dangerouslySetInnerHTML={{ __html: qrSvg }} />
+          <strong className="qr-ready">Ready for student scans</strong>
+          <span className="qr-helper">Expires in 10 minutes · regenerate to invalidate the current token</span>
+        </div>
+        <aside className="panel live-panel enrollment-info">
+          <p className="eyebrow">HOW IT WORKS</p>
+          <ol className="enrollment-steps">
+            <li>Show this QR to the class.</li>
+            <li>Each student scans it on their phone.</li>
+            <li>APEX uses the class ID and temporary token to start enrollment.</li>
+            <li>Student identity is then verified before the roster is changed.</li>
+          </ol>
+          <div className="enrollment-token">
+            <span>Session token</span>
+            <strong>{session.token}</strong>
+            <Button icon="copy" onClick={copyToken}>Copy token</Button>
+          </div>
+          <div className="send-safety">
+            <strong>Important</strong>
+            <span>The desktop app currently generates and displays the real QR payload. A phone-to-desktop enrollment endpoint is the next integration step; we are not pretending a local Tauri screen is reachable from a student's phone.</span>
+          </div>
+        </aside>
+      </section>
+    </>
+  );
+}
+
+function createEnrollmentSession(classId: string) {
+  const token = crypto.randomUUID().replaceAll("-", "").slice(0, 12).toUpperCase();
+  const expiresAt = Date.now() + 10 * 60 * 1000;
+  return {
+    classId,
+    token,
+    payload: `APEX-ENROLL-V1|class=${classId}|token=${token}|expires=${expiresAt}`,
+  };
+}
+
 function QRSession() {
   const [active, setActive] = useState(true);
   return (
@@ -564,6 +637,7 @@ export default function App() {
       {workspace === "messaging" ? <Messaging /> : null}
       {workspace === "reports" ? <Reports students={attendanceStudents} /> : null}
       {workspace === "qr" ? <QRSession /> : null}
+      {workspace === "enroll" ? <EnrollmentQR classId={selectedClassId} classes={academicData.classes} setWorkspace={setWorkspace} /> : null}
     </Shell>
   );
 }
