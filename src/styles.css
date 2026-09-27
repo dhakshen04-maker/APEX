@@ -303,3 +303,32 @@ textarea { display: block; width: 100%; min-height: 150px; resize: vertical; mar
   .class-toolbar { align-items: flex-start; flex-direction: column; }
   .class-count { justify-items: start; }
 }
+
+.panel-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.empty-roster-icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid #30443a;
+  border-radius: 13px;
+  color: #91b39b;
+  background: #132019;
+}
+
+.empty-roster-icon .icon {
+  width: 20px;
+  height: 20px;
+}
+
+@media (max-width: 580px) {
+  .panel-head-actions {
+    align-items: flex-end;
+    flex-direction: column;
+  }
+}
