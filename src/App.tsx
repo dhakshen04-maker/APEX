@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 
 type Workspace = "dashboard" | "attendance" | "spreadsheets" | "messaging" | "reports" | "qr";
 
@@ -30,7 +30,7 @@ function Orb() {
 }
 
 function Icon({ name }: { name: "arrow" | "plus" | "search" | "download" | "send" | "qr" | "sheet" }) {
-  const paths: Record<string, JSX.Element> = {
+  const paths: Record<string, ReactNode> = {
     arrow: <path d="M5 12h14M13 6l6 6-6 6" />,
     plus: <path d="M12 5v14M5 12h14" />,
     search: <><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4 4" /></>,
@@ -51,7 +51,7 @@ function Button({ children, variant = "secondary", onClick, icon }: { children: 
   );
 }
 
-function Shell({ workspace, setWorkspace, children }: { workspace: Workspace; setWorkspace: (workspace: Workspace) => void; children: React.ReactNode }) {
+function Shell({ workspace, setWorkspace, children }: { workspace: Workspace; setWorkspace: (workspace: Workspace) => void; children: ReactNode }) {
   return (
     <main className="app-shell">
       <header className="topbar">
