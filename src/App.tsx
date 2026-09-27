@@ -409,7 +409,7 @@ function Students({
           <p className="eyebrow">ROSTER INPUTS</p>
           <Button variant="primary" icon="qr" onClick={() => setWorkspace("enroll")}>Add students with QR</Button>
           <p className="action-description">Generate one temporary enrollment QR for this selected class. Students can scan it from their phones.</p>
-          <p className="eyebrow">ADD DEPARTMENT / SECTION</p
+          <p className="eyebrow">ADD DEPARTMENT / SECTION</p>
           <label>Department<input className="text-input" value={newDepartment} onChange={(event) => setNewDepartment(event.target.value)} placeholder="e.g. CSE" /></label>
           <label>Section<input className="text-input" value={newSection} onChange={(event) => setNewSection(event.target.value)} placeholder="e.g. A" /></label>
           <Button variant="primary" onClick={addClass}>Create class</Button>
