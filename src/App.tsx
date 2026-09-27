@@ -1,4 +1,5 @@
 import { useMemo, useState, type ReactNode } from "react";
+import { getAttendancePercentage, getAttendanceSummary, loadAttendance, saveAttendance, type AttendanceStudent } from "./data/attendance";
 
 type Workspace = "dashboard" | "attendance" | "spreadsheets" | "messaging" | "reports" | "qr";
 
@@ -8,14 +9,6 @@ const navItems: Array<{ id: Workspace; label: string }> = [
   { id: "spreadsheets", label: "Spreadsheets" },
   { id: "messaging", label: "Messaging" },
   { id: "reports", label: "Reports" },
-];
-
-const students = [
-  { name: "Arun Kumar", roll: "23CSE001", present: true, percentage: 91 },
-  { name: "Divya S", roll: "23CSE002", present: true, percentage: 88 },
-  { name: "Harish R", roll: "23CSE003", present: false, percentage: 72 },
-  { name: "Keerthana P", roll: "23CSE004", present: true, percentage: 84 },
-  { name: "Manoj K", roll: "23CSE005", present: false, percentage: 68 },
 ];
 
 function Orb() {
@@ -119,10 +112,29 @@ function Dashboard({ setWorkspace }: { setWorkspace: (workspace: Workspace) => v
   );
 }
 
-function Attendance({ setWorkspace }: { setWorkspace: (workspace: Workspace) => void }) {
+function Attendance({
+  students,
+  setStudents,
+  setWorkspace,
+}: {
+  students: AttendanceStudent[];
+  setStudents: (students: AttendanceStudent[]) => void;
+  setWorkspace: (workspace: Workspace) => void;
+}) {
   const [filter, setFilter] = useState<"all" | "low">("all");
-  const [sessionOpen, setSessionOpen] = useState(false);
-  const visible = useMemo(() => filter === "low" ? students.filter((student) => student.percentage < 75) : students, [filter]);
+  const [editorOpen, setEditorOpen] = useState(false);
+  const summary = getAttendanceSummary(students);
+  const visible = useMemo(
+    () => filter === "low" ? students.filter((student) => getAttendancePercentage(student) < 75) : students,
+    [filter, students],
+  );
+
+  const applyAttendance = (draft: AttendanceStudent[]) => {
+    setStudents(draft);
+    saveAttendance(draft);
+    setEditorOpen(false);
+  };
+
   return (
     <>
       <PageHeader
@@ -139,56 +151,124 @@ function Attendance({ setWorkspace }: { setWorkspace: (workspace: Workspace) => 
         <Button icon="sheet" onClick={() => setWorkspace("spreadsheets")}>Open spreadsheet</Button>
       </section>
       <section className="metric-grid">
-        <Metric label="Present" value="32" meta="of 58 enrolled" />
-        <Metric label="Absent" value="26" meta="today" />
-        <Metric label="Attendance %" value="84.6%" meta="current subject" />
-        <Metric label="Below threshold" value="2" meta="below 75%" />
+        <Metric label="Present" value={String(summary.present)} meta={`of ${students.length} loaded students`} />
+        <Metric label="Absent" value={String(summary.absent)} meta="today" />
+        <Metric label="Average" value={`${summary.average}%`} meta="calculated from records" />
+        <Metric label="Below threshold" value={String(summary.belowThreshold)} meta="below 75%" />
       </section>
       <section className="workspace-layout">
         <div className="panel table-panel">
-          <div className="panel-head"><div><p className="eyebrow">TODAY'S RECORD</p><h2>CSE-A · Data Structures</h2></div><span className="pill">Draft session</span></div>
-          <div className="table-tools"><Button variant={filter === "all" ? "primary" : "secondary"} onClick={() => setFilter("all")}>All students</Button><Button variant={filter === "low" ? "primary" : "secondary"} onClick={() => setFilter("low")}>Below 75%</Button></div>
-          <div className="table-wrap">
-            <table><thead><tr><th>Student</th><th>Roll no.</th><th>Today</th><th>Attendance</th></tr></thead><tbody>
-              {visible.map((student) => <tr key={student.roll}><td>{student.name}</td><td className="muted">{student.roll}</td><td><span className={`attendance-state ${student.present ? "present" : "absent"}`}>{student.present ? "Present" : "Absent"}</span></td><td>{student.percentage}%</td></tr>)}
-            </tbody></table>
+          <div className="panel-head">
+            <div><p className="eyebrow">TODAY'S RECORD</p><h2>CSE-A · Data Structures</h2></div>
+            <span className="pill">Local draft</span>
           </div>
+          <div className="table-tools">
+            <Button variant={filter === "all" ? "primary" : "secondary"} onClick={() => setFilter("all")}>All students</Button>
+            <Button variant={filter === "low" ? "primary" : "secondary"} onClick={() => setFilter("low")}>Below 75%</Button>
+          </div>
+          <div className="table-wrap">
+            <table>
+              <thead><tr><th>Student</th><th>Roll no.</th><th>Today</th><th>Attendance</th></tr></thead>
+              <tbody>
+                {visible.map((student) => (
+                  <tr key={student.id}>
+                    <td>{student.name}</td>
+                    <td className="muted">{student.roll}</td>
+                    <td><span className={`attendance-state ${student.today}`}>{student.today === "present" ? "Present" : "Absent"}</span></td>
+                    <td>{getAttendancePercentage(student)}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="data-note">This first functional slice stores attendance locally in this APEX installation. It is not yet connected to a shared database.</div>
         </div>
         <aside className="panel action-panel">
           <p className="eyebrow">ATTENDANCE ACTIONS</p>
-          <Button variant="primary" onClick={() => setSessionOpen(true)}>Mark attendance</Button>
+          <Button variant="primary" onClick={() => setEditorOpen(true)}>Mark attendance</Button>
           <Button onClick={() => setWorkspace("qr")} icon="qr">Start QR session</Button>
           <Button onClick={() => setFilter("low")}>Find low-attendance students</Button>
           <Button onClick={() => setWorkspace("reports")} icon="download">Generate report</Button>
-          <div className="mini-note">Data-changing actions are reviewed before APEX executes them.</div>
+          <div className="mini-note">Changes are saved locally after confirmation. Shared accounts/database will be added after the data layer is selected.</div>
         </aside>
       </section>
-      {sessionOpen ? <Confirm title="Mark today's attendance?" detail="APEX will prepare a change for CSE-A · Data Structures. Nothing is written until you confirm." onCancel={() => setSessionOpen(false)} onConfirm={() => setSessionOpen(false)} /> : null}
+      {editorOpen ? (
+        <AttendanceEditor students={students} onCancel={() => setEditorOpen(false)} onSave={applyAttendance} />
+      ) : null}
     </>
   );
 }
 
+function AttendanceEditor({
+  students,
+  onCancel,
+  onSave,
+}: {
+  students: AttendanceStudent[];
+  onCancel: () => void;
+  onSave: (students: AttendanceStudent[]) => void;
+}) {
+  const [draft, setDraft] = useState<AttendanceStudent[]>(students);
+
+  const toggle = (id: string) => {
+    setDraft((current) => current.map((student) =>
+      student.id === id
+        ? { ...student, today: student.today === "present" ? "absent" : "present" }
+        : student,
+    ));
+  };
+
+  const summary = getAttendanceSummary(draft);
+
+  return (
+    <div className="modal-backdrop" role="presentation">
+      <div className="confirm-modal attendance-editor" role="dialog" aria-modal="true">
+        <p className="eyebrow">MARK ATTENDANCE</p>
+        <h2>CSE-A · Data Structures</h2>
+        <p>Review each student's status. APEX will save the confirmed attendance record locally.</p>
+        <div className="editor-summary">
+          <span><strong>{summary.present}</strong> Present</span>
+          <span><strong>{summary.absent}</strong> Absent</span>
+        </div>
+        <div className="editor-list">
+          {draft.map((student) => (
+            <button className="editor-row" type="button" key={student.id} onClick={() => toggle(student.id)}>
+              <span><strong>{student.name}</strong><small>{student.roll}</small></span>
+              <span className={`attendance-state ${student.today}`}>{student.today === "present" ? "Present" : "Absent"}</span>
+            </button>
+          ))}
+        </div>
+        <div className="modal-actions">
+          <Button onClick={onCancel}>Cancel</Button>
+          <Button variant="primary" onClick={() => onSave(draft)}>Confirm & save</Button>
+        </div>
+      </div>
+    </div>
+  );
+}
 function Metric({ label, value, meta }: { label: string; value: string; meta: string }) {
   return <div className="metric"><span>{label}</span><strong>{value}</strong><small>{meta}</small></div>;
 }
 
-function Spreadsheets() {
+function Spreadsheets({ students }: { students: AttendanceStudent[] }) {
   const [saved, setSaved] = useState(false);
+  const summary = getAttendanceSummary(students);
+
   return (
     <>
       <PageHeader eyebrow="SPREADSHEETS" title="Spreadsheets" subtitle="Open attendance sheets, inspect student data, make safe updates, and generate clean reports." action={<Button variant="primary" icon="sheet">Select spreadsheet</Button>} />
-      <section className="control-row"><button className="date-chip" type="button">Attendance · CSE-A.xlsx</button><Button icon="search">Search students</Button><Button>Filter</Button><span className="control-spacer" /><Button variant="primary" onClick={() => setSaved(true)}>Save changes</Button></section>
+      <section className="control-row"><button className="date-chip" type="button">Attendance · CSE-A</button><Button icon="search">Search students</Button><Button>Filter</Button><span className="control-spacer" /><Button variant="primary" onClick={() => setSaved(true)}>Save changes</Button></section>
       <section className="workspace-layout">
         <div className="panel table-panel">
-          <div className="panel-head"><div><p className="eyebrow">ATTENDANCE SHEET</p><h2>September 2026</h2><span className="panel-meta">58 rows · 4 columns · synced from local file</span></div>{saved ? <span className="pill success">Saved</span> : <span className="pill">No pending changes</span>}</div>
-          <div className="table-wrap spreadsheet"><table><thead><tr><th>Student</th><th>Roll no.</th><th>Present</th><th>Absent</th><th>Attendance %</th></tr></thead><tbody>{students.map((student) => <tr key={student.roll}><td>{student.name}</td><td className="muted">{student.roll}</td><td>{student.present ? 18 : 0}</td><td>{student.present ? 2 : 5}</td><td>{student.percentage}%</td></tr>)}</tbody></table></div>
+          <div className="panel-head"><div><p className="eyebrow">ATTENDANCE DATA</p><h2>CSE-A · Current session</h2><span className="panel-meta">{students.length} loaded students · {summary.present} present · {summary.absent} absent</span></div>{saved ? <span className="pill success">Saved locally</span> : <span className="pill">Local data</span>}</div>
+          <div className="table-wrap spreadsheet"><table><thead><tr><th>Student</th><th>Roll no.</th><th>Today</th><th>Attendance %</th></tr></thead><tbody>{students.map((student) => <tr key={student.id}><td>{student.name}</td><td className="muted">{student.roll}</td><td><span className={`attendance-state ${student.today}`}>{student.today === "present" ? "Present" : "Absent"}</span></td><td>{getAttendancePercentage(student)}%</td></tr>)}</tbody></table></div>
+          <div className="data-note">Spreadsheet import/export is the next integration layer. These rows currently come from APEX's local attendance store.</div>
         </div>
-        <aside className="panel action-panel"><p className="eyebrow">SPREADSHEET ACTIONS</p><Button icon="search">Find student</Button><Button>Sort attendance</Button><Button>Calculate percentages</Button><Button icon="download">Generate report</Button><div className="mini-note">Changes are reviewed before APEX writes back to the spreadsheet.</div></aside>
+        <aside className="panel action-panel"><p className="eyebrow">SPREADSHEET ACTIONS</p><Button icon="search">Find student</Button><Button>Sort attendance</Button><Button>Calculate percentages</Button><Button icon="download">Generate report</Button><div className="mini-note">No external spreadsheet is connected yet.</div></aside>
       </section>
     </>
   );
 }
-
 function Messaging() {
   const [channel, setChannel] = useState("WhatsApp");
   const [review, setReview] = useState(false);
@@ -212,17 +292,17 @@ function Messaging() {
   );
 }
 
-function Reports() {
+function Reports({ students }: { students: AttendanceStudent[] }) {
+  const summary = getAttendanceSummary(students);
   return (
     <>
       <PageHeader eyebrow="REPORTS" title="Reports" subtitle="Generate clear reports from validated attendance data, with a preview before export." action={<Button variant="primary" icon="download">Export report</Button>} />
-      <section className="control-row"><select aria-label="Class"><option>CSE-A</option></select><select aria-label="Subject"><option>Data Structures</option></select><button className="date-chip" type="button">01 Sep — 27 Sep 2026</button><span className="control-spacer" /><span className="pill">Preview ready</span></section>
-      <section className="metric-grid"><Metric label="Enrolled" value="58" meta="students" /><Metric label="Present" value="1,042" meta="records" /><Metric label="Absent" value="170" meta="records" /><Metric label="Average" value="84.6%" meta="attendance" /></section>
-      <section className="report-grid"><div className="panel report-preview"><div className="panel-head"><div><p className="eyebrow">REPORT PREVIEW</p><h2>Attendance summary · CSE-A</h2></div><span className="pill">Verified data</span></div><div className="report-bars"><div><span>Attendance</span><strong>84.6%</strong><i style={{ width: "84.6%" }} /></div><div><span>Below 75%</span><strong>2 students</strong><i style={{ width: "18%" }} /></div></div><div className="table-wrap"><table><thead><tr><th>Student</th><th>Roll no.</th><th>Attendance</th><th>Status</th></tr></thead><tbody>{students.map((student) => <tr key={student.roll}><td>{student.name}</td><td className="muted">{student.roll}</td><td>{student.percentage}%</td><td><span className={`attendance-state ${student.percentage < 75 ? "absent" : "present"}`}>{student.percentage < 75 ? "Needs attention" : "On track"}</span></td></tr>)}</tbody></table></div></div><aside className="panel action-panel"><p className="eyebrow">REPORT ACTIONS</p><Button variant="primary" icon="download">Export PDF</Button><Button icon="sheet">Export spreadsheet</Button><Button>Filter below 75%</Button><div className="mini-note">APEX verifies the selected class, subject, period, and data source before export.</div></aside></section>
+      <section className="control-row"><select aria-label="Class"><option>CSE-A</option></select><select aria-label="Subject"><option>Data Structures</option></select><button className="date-chip" type="button">27 Sep 2026 · Today</button><span className="control-spacer" /><span className="pill">Calculated locally</span></section>
+      <section className="metric-grid"><Metric label="Loaded" value={String(students.length)} meta="students" /><Metric label="Present" value={String(summary.present)} meta="today" /><Metric label="Absent" value={String(summary.absent)} meta="today" /><Metric label="Average" value={`${summary.average}%`} meta="attendance" /></section>
+      <section className="report-grid"><div className="panel report-preview"><div className="panel-head"><div><p className="eyebrow">REPORT PREVIEW</p><h2>Attendance summary · CSE-A</h2></div><span className="pill">Validated calculation</span></div><div className="report-bars"><div><span>Average attendance</span><strong>{summary.average}%</strong><i style={{ width: `${summary.average}%` }} /></div><div><span>Below 75%</span><strong>{summary.belowThreshold} students</strong><i style={{ width: `${Math.min(100, (summary.belowThreshold / Math.max(1, students.length)) * 100)}%` }} /></div></div><div className="table-wrap"><table><thead><tr><th>Student</th><th>Roll no.</th><th>Attendance</th><th>Status</th></tr></thead><tbody>{students.map((student) => <tr key={student.id}><td>{student.name}</td><td className="muted">{student.roll}</td><td>{getAttendancePercentage(student)}%</td><td><span className={`attendance-state ${getAttendancePercentage(student) < 75 ? "absent" : "present"}`}>{getAttendancePercentage(student) < 75 ? "Needs attention" : "On track"}</span></td></tr>)}</tbody></table></div></div><aside className="panel action-panel"><p className="eyebrow">REPORT ACTIONS</p><Button variant="primary" icon="download">Export PDF</Button><Button icon="sheet">Export spreadsheet</Button><Button>Filter below 75%</Button><div className="mini-note">Export remains a UI action until the report/file generation layer is implemented.</div></aside></section>
     </>
   );
 }
-
 function QRSession() {
   const [active, setActive] = useState(true);
   return (
@@ -242,13 +322,15 @@ function Confirm({ title, detail, onCancel, onConfirm, confirmLabel = "Confirm" 
 
 export default function App() {
   const [workspace, setWorkspace] = useState<Workspace>("dashboard");
+  const [attendanceStudents, setAttendanceStudents] = useState<AttendanceStudent[]>(() => loadAttendance());
+
   return (
     <Shell workspace={workspace} setWorkspace={setWorkspace}>
       {workspace === "dashboard" ? <Dashboard setWorkspace={setWorkspace} /> : null}
-      {workspace === "attendance" ? <Attendance setWorkspace={setWorkspace} /> : null}
-      {workspace === "spreadsheets" ? <Spreadsheets /> : null}
+      {workspace === "attendance" ? <Attendance students={attendanceStudents} setStudents={setAttendanceStudents} setWorkspace={setWorkspace} /> : null}
+      {workspace === "spreadsheets" ? <Spreadsheets students={attendanceStudents} /> : null}
       {workspace === "messaging" ? <Messaging /> : null}
-      {workspace === "reports" ? <Reports /> : null}
+      {workspace === "reports" ? <Reports students={attendanceStudents} /> : null}
       {workspace === "qr" ? <QRSession /> : null}
     </Shell>
   );
