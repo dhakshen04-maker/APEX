@@ -9,30 +9,47 @@ export type AttendanceStudent = {
   today: AttendanceStatus;
 };
 
-const STORAGE_KEY = "apex.attendance.cse-a.data.v1";
+const seedHistory: Record<string, Pick<AttendanceStudent, "sessionsBeforeToday" | "attendedBeforeToday">> = {
+  "stu-001": { sessionsBeforeToday: 21, attendedBeforeToday: 19 },
+  "stu-002": { sessionsBeforeToday: 23, attendedBeforeToday: 21 },
+  "stu-003": { sessionsBeforeToday: 24, attendedBeforeToday: 18 },
+  "stu-004": { sessionsBeforeToday: 23, attendedBeforeToday: 20 },
+  "stu-005": { sessionsBeforeToday: 24, attendedBeforeToday: 16 },
+};
 
-export const seedAttendance: AttendanceStudent[] = [
-  { id: "stu-001", name: "Arun Kumar", roll: "23CSE001", sessionsBeforeToday: 21, attendedBeforeToday: 19, today: "present" },
-  { id: "stu-002", name: "Divya S", roll: "23CSE002", sessionsBeforeToday: 23, attendedBeforeToday: 21, today: "present" },
-  { id: "stu-003", name: "Harish R", roll: "23CSE003", sessionsBeforeToday: 24, attendedBeforeToday: 18, today: "absent" },
-  { id: "stu-004", name: "Keerthana P", roll: "23CSE004", sessionsBeforeToday: 23, attendedBeforeToday: 20, today: "present" },
-  { id: "stu-005", name: "Manoj K", roll: "23CSE005", sessionsBeforeToday: 24, attendedBeforeToday: 16, today: "absent" },
-];
+function storageKey(classId: string) {
+  return "apex.attendance." + classId + ".data.v1";
+}
 
-export function loadAttendance(): AttendanceStudent[] {
+export function loadAttendance(
+  classId = "CSE-A",
+  roster: Array<{ id: string; name: string; roll: string }> = [],
+): AttendanceStudent[] {
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return seedAttendance;
-    const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return seedAttendance;
-    return parsed as AttendanceStudent[];
+    const raw = window.localStorage.getItem(storageKey(classId));
+    const parsed: unknown = raw ? JSON.parse(raw) : null;
+    const stored = Array.isArray(parsed) ? parsed as AttendanceStudent[] : [];
+    const byId = new Map(stored.map((student) => [student.id, student]));
+
+    return roster.map((student) => {
+      const existing = byId.get(student.id);
+      if (existing) return { ...existing, name: student.name, roll: student.roll };
+      const history = seedHistory[student.id] ?? { sessionsBeforeToday: 0, attendedBeforeToday: 0 };
+      return { id: student.id, name: student.name, roll: student.roll, ...history, today: "absent" };
+    });
   } catch {
-    return seedAttendance;
+    return roster.map((student) => ({
+      id: student.id,
+      name: student.name,
+      roll: student.roll,
+      ...(seedHistory[student.id] ?? { sessionsBeforeToday: 0, attendedBeforeToday: 0 }),
+      today: "absent",
+    }));
   }
 }
 
-export function saveAttendance(students: AttendanceStudent[]) {
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(students));
+export function saveAttendance(classId: string, students: AttendanceStudent[]) {
+  window.localStorage.setItem(storageKey(classId), JSON.stringify(students));
 }
 
 export function getAttendancePercentage(student: AttendanceStudent): number {
@@ -48,6 +65,5 @@ export function getAttendanceSummary(students: AttendanceStudent[]) {
   const average = students.length
     ? Math.round(students.reduce((sum, student) => sum + getAttendancePercentage(student), 0) / students.length)
     : 0;
-
   return { present, absent, belowThreshold, average };
 }
