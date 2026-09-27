@@ -139,3 +139,79 @@ textarea { display: block; width: 100%; min-height: 150px; resize: vertical; mar
   .page-header h1 { font-size: 39px; }
   .session-grid { grid-template-columns: 1fr; }
 }
+
+
+.data-note {
+  padding: 13px 22px;
+  border-top: 1px solid #18241e;
+  color: #69756f;
+  font-size: 10px;
+  line-height: 1.55;
+}
+
+.attendance-editor {
+  max-height: min(760px, calc(100vh - 40px));
+  overflow: auto;
+}
+
+.editor-summary {
+  display: flex;
+  gap: 8px;
+  margin: 18px 0 12px;
+}
+
+.editor-summary span {
+  padding: 8px 10px;
+  border: 1px solid #24332b;
+  border-radius: 10px;
+  color: #8b9690;
+  background: #0b120e;
+  font-size: 10px;
+}
+
+.editor-summary strong {
+  color: #e2e5e3;
+  margin-right: 4px;
+}
+
+.editor-list {
+  display: grid;
+  gap: 6px;
+  max-height: 340px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.editor-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 11px 12px;
+  border: 1px solid #1d2a23;
+  border-radius: 11px;
+  color: inherit;
+  background: #0b120e;
+  text-align: left;
+}
+
+.editor-row:hover {
+  border-color: #30443a;
+  background: #111a15;
+}
+
+.editor-row > span:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.editor-row strong {
+  color: #d9dedb;
+  font-size: 11px;
+}
+
+.editor-row small {
+  color: #68746e;
+  font-size: 9px;
+}
