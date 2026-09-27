@@ -1,11 +1,13 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { getAttendancePercentage, getAttendanceSummary, loadAttendance, saveAttendance, type AttendanceStudent } from "./data/attendance";
+import { getClassLabel, getClassStudents, loadAcademicData, saveAcademicData, type AcademicClass, type AcademicData } from "./data/academics";
 
-type Workspace = "dashboard" | "attendance" | "spreadsheets" | "messaging" | "reports" | "qr";
+type Workspace = "dashboard" | "attendance" | "students" | "spreadsheets" | "messaging" | "reports" | "qr";
 
 const navItems: Array<{ id: Workspace; label: string }> = [
   { id: "dashboard", label: "Dashboard" },
   { id: "attendance", label: "Attendance" },
+  { id: "students", label: "Students" },
   { id: "spreadsheets", label: "Spreadsheets" },
   { id: "messaging", label: "Messaging" },
   { id: "reports", label: "Reports" },
@@ -116,10 +118,16 @@ function Attendance({
   students,
   setStudents,
   setWorkspace,
+  classes,
+  classId,
+  onClassChange,
 }: {
   students: AttendanceStudent[];
   setStudents: (students: AttendanceStudent[]) => void;
   setWorkspace: (workspace: Workspace) => void;
+  classes: AcademicClass[];
+  classId: string;
+  onClassChange: (classId: string) => void;
 }) {
   const [filter, setFilter] = useState<"all" | "low">("all");
   const [editorOpen, setEditorOpen] = useState(false);
@@ -131,7 +139,7 @@ function Attendance({
 
   const applyAttendance = (draft: AttendanceStudent[]) => {
     setStudents(draft);
-    saveAttendance(draft);
+    saveAttendance(classId, draft);
     setEditorOpen(false);
   };
 
@@ -144,7 +152,9 @@ function Attendance({
         action={<Button variant="primary" icon="qr" onClick={() => setWorkspace("qr")}>Start QR attendance</Button>}
       />
       <section className="control-row">
-        <select aria-label="Class"><option>CSE-A</option><option>CSE-B</option></select>
+        <select aria-label="Class" value={classId} onChange={(event) => onClassChange(event.target.value)}>
+          {classes.map((classItem) => <option key={classItem.id} value={classItem.id}>{getClassLabel(classItem)}</option>)}
+        </select>
         <select aria-label="Subject"><option>Data Structures</option><option>Operating Systems</option></select>
         <button className="date-chip" type="button">27 Sep 2026 · Today</button>
         <span className="control-spacer" />
@@ -159,7 +169,7 @@ function Attendance({
       <section className="workspace-layout">
         <div className="panel table-panel">
           <div className="panel-head">
-            <div><p className="eyebrow">TODAY'S RECORD</p><h2>CSE-A · Data Structures</h2></div>
+            <div><p className="eyebrow">TODAY'S RECORD</p><h2>{classId} · Data Structures</h2></div>
             <span className="pill">Local draft</span>
           </div>
           <div className="table-tools">
@@ -250,6 +260,177 @@ function Metric({ label, value, meta }: { label: string; value: string; meta: st
   return <div className="metric"><span>{label}</span><strong>{value}</strong><small>{meta}</small></div>;
 }
 
+
+function Students({
+  data,
+  setData,
+  selectedClassId,
+  setSelectedClassId,
+  refreshAttendance,
+}: {
+  data: AcademicData;
+  setData: (data: AcademicData) => void;
+  selectedClassId: string;
+  setSelectedClassId: (classId: string) => void;
+  refreshAttendance: (classId: string) => void;
+}) {
+  const [name, setName] = useState("");
+  const [roll, setRoll] = useState("");
+  const [newDepartment, setNewDepartment] = useState("");
+  const [newSection, setNewSection] = useState("");
+  const [confirmAdd, setConfirmAdd] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
+
+  const selectedClass = data.classes.find((item) => item.id === selectedClassId) ?? data.classes[0];
+  const classStudents = selectedClass ? getClassStudents(data, selectedClass.id) : [];
+
+  const addStudent = () => {
+    const cleanName = name.trim();
+    const cleanRoll = roll.trim();
+    if (!selectedClass || !cleanName || !cleanRoll) return;
+    if (data.students.some((student) => student.classId === selectedClass.id && student.roll.toLowerCase() === cleanRoll.toLowerCase() && student.status === "active")) return;
+
+    const next: AcademicData = {
+      ...data,
+      students: [
+        ...data.students,
+        {
+          id: "stu-" + Date.now(),
+          name: cleanName,
+          roll: cleanRoll,
+          classId: selectedClass.id,
+          status: "active",
+        },
+      ],
+    };
+    setData(next);
+    setName("");
+    setRoll("");
+    setConfirmAdd(false);
+    refreshAttendance(selectedClass.id);
+  };
+
+  const removeStudent = (studentId: string) => {
+    const next: AcademicData = {
+      ...data,
+      students: data.students.map((student) => student.id === studentId ? { ...student, status: "inactive" } : student),
+    };
+    setData(next);
+    setConfirmRemove(null);
+    refreshAttendance(selectedClass.id);
+  };
+
+  const addClass = () => {
+    const department = newDepartment.trim().toUpperCase();
+    const section = newSection.trim().toUpperCase();
+    if (!department || !section) return;
+    const id = department + "-" + section;
+    if (data.classes.some((item) => item.id === id)) return;
+
+    const next: AcademicData = {
+      ...data,
+      classes: [...data.classes, { id, department, section }],
+    };
+    setData(next);
+    setSelectedClassId(id);
+    setNewDepartment("");
+    setNewSection("");
+  };
+
+  return (
+    <>
+      <PageHeader
+        eyebrow="STUDENTS & CLASSES"
+        title="Class management"
+        subtitle="Add your real student roster and organize students by department and section."
+        action={<Button variant="primary" icon="plus" onClick={() => setConfirmAdd(true)}>Add student</Button>}
+      />
+
+      <section className="class-toolbar">
+        <div>
+          <p className="eyebrow">SELECT CLASS</p>
+          <select value={selectedClass?.id ?? ""} onChange={(event) => setSelectedClassId(event.target.value)} aria-label="Student class">
+            {data.classes.map((item) => <option key={item.id} value={item.id}>{item.department} · {item.section}</option>)}
+          </select>
+        </div>
+        <div className="class-count">
+          <strong>{classStudents.length}</strong>
+          <span>active students</span>
+        </div>
+      </section>
+
+      <section className="student-management-grid">
+        <div className="panel table-panel">
+          <div className="panel-head">
+            <div><p className="eyebrow">ROSTER</p><h2>{selectedClass ? selectedClass.department + " · " + selectedClass.section : "No class selected"}</h2></div>
+            <span className="pill">{classStudents.length} students</span>
+          </div>
+          {classStudents.length ? (
+            <div className="table-wrap">
+              <table>
+                <thead><tr><th>Student</th><th>Roll no.</th><th>Status</th><th /></tr></thead>
+                <tbody>
+                  {classStudents.map((student) => (
+                    <tr key={student.id}>
+                      <td>{student.name}</td>
+                      <td className="muted">{student.roll}</td>
+                      <td><span className="attendance-state present">Active</span></td>
+                      <td><button className="table-action" type="button" onClick={() => setConfirmRemove(student.id)}>Remove</button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="empty-roster">
+              <strong>No students added yet.</strong>
+              <span>Add students manually now. Spreadsheet import will be added as the next roster input method.</span>
+              <Button variant="primary" icon="plus" onClick={() => setConfirmAdd(true)}>Add first student</Button>
+            </div>
+          )}
+          <div className="data-note">Roster data is stored locally in this APEX installation. It will become shared account/database data when the backend is implemented.</div>
+        </div>
+
+        <aside className="panel action-panel">
+          <p className="eyebrow">ADD DEPARTMENT / SECTION</p>
+          <label>Department<input className="text-input" value={newDepartment} onChange={(event) => setNewDepartment(event.target.value)} placeholder="e.g. CSE" /></label>
+          <label>Section<input className="text-input" value={newSection} onChange={(event) => setNewSection(event.target.value)} placeholder="e.g. A" /></label>
+          <Button variant="primary" onClick={addClass}>Create class</Button>
+          <div className="class-list">
+            {data.classes.map((item) => <span key={item.id}>{item.department} · {item.section}</span>)}
+          </div>
+          <div className="mini-note">Example sections are included only to demonstrate the structure. Replace them with your institution's real departments and sections.</div>
+        </aside>
+      </section>
+
+      {confirmAdd ? (
+        <div className="modal-backdrop" role="presentation">
+          <div className="confirm-modal" role="dialog" aria-modal="true">
+            <p className="eyebrow">ADD STUDENT</p>
+            <h2>{selectedClass ? selectedClass.department + " · " + selectedClass.section : "Class"}</h2>
+            <label>Student name<input className="text-input" value={name} onChange={(event) => setName(event.target.value)} placeholder="Full name" autoFocus /></label>
+            <label>Roll number / Student ID<input className="text-input" value={roll} onChange={(event) => setRoll(event.target.value)} placeholder="e.g. 23CSE001" /></label>
+            <div className="modal-actions">
+              <Button onClick={() => setConfirmAdd(false)}>Cancel</Button>
+              <Button variant="primary" onClick={addStudent}>Add student</Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {confirmRemove ? (
+        <Confirm
+          title="Remove this student?"
+          detail="The student will be marked inactive in this local roster. Existing attendance history is not deleted by this action."
+          onCancel={() => setConfirmRemove(null)}
+          onConfirm={() => removeStudent(confirmRemove)}
+          confirmLabel="Remove student"
+        />
+      ) : null}
+    </>
+  );
+}
+
 function Spreadsheets({ students }: { students: AttendanceStudent[] }) {
   const [saved, setSaved] = useState(false);
   const summary = getAttendanceSummary(students);
@@ -322,12 +503,49 @@ function Confirm({ title, detail, onCancel, onConfirm, confirmLabel = "Confirm" 
 
 export default function App() {
   const [workspace, setWorkspace] = useState<Workspace>("dashboard");
-  const [attendanceStudents, setAttendanceStudents] = useState<AttendanceStudent[]>(() => loadAttendance());
+  const [academicData, setAcademicData] = useState<AcademicData>(() => loadAcademicData());
+  const [selectedClassId, setSelectedClassId] = useState("CSE-A");
+  const [attendanceStudents, setAttendanceStudents] = useState<AttendanceStudent[]>(() => {
+    const data = loadAcademicData();
+    return loadAttendance("CSE-A", getClassStudents(data, "CSE-A"));
+  });
+
+  const changeClass = (classId: string) => {
+    setSelectedClassId(classId);
+    setAttendanceStudents(loadAttendance(classId, getClassStudents(academicData, classId)));
+  };
+
+  const refreshAttendance = (classId: string) => {
+    if (classId === selectedClassId) setAttendanceStudents(loadAttendance(classId, getClassStudents(academicData, classId)));
+  };
+
+  const updateAcademicData = (data: AcademicData) => {
+    setAcademicData(data);
+    saveAcademicData(data);
+  };
 
   return (
     <Shell workspace={workspace} setWorkspace={setWorkspace}>
       {workspace === "dashboard" ? <Dashboard setWorkspace={setWorkspace} /> : null}
-      {workspace === "attendance" ? <Attendance students={attendanceStudents} setStudents={setAttendanceStudents} setWorkspace={setWorkspace} /> : null}
+      {workspace === "attendance" ? (
+        <Attendance
+          students={attendanceStudents}
+          setStudents={setAttendanceStudents}
+          setWorkspace={setWorkspace}
+          classes={academicData.classes}
+          classId={selectedClassId}
+          onClassChange={changeClass}
+        />
+      ) : null}
+      {workspace === "students" ? (
+        <Students
+          data={academicData}
+          setData={updateAcademicData}
+          selectedClassId={selectedClassId}
+          setSelectedClassId={changeClass}
+          refreshAttendance={refreshAttendance}
+        />
+      ) : null}
       {workspace === "spreadsheets" ? <Spreadsheets students={attendanceStudents} /> : null}
       {workspace === "messaging" ? <Messaging /> : null}
       {workspace === "reports" ? <Reports students={attendanceStudents} /> : null}
