@@ -9,16 +9,8 @@ export type AttendanceStudent = {
   today: AttendanceStatus;
 };
 
-const seedHistory: Record<string, Pick<AttendanceStudent, "sessionsBeforeToday" | "attendedBeforeToday">> = {
-  "stu-001": { sessionsBeforeToday: 21, attendedBeforeToday: 19 },
-  "stu-002": { sessionsBeforeToday: 23, attendedBeforeToday: 21 },
-  "stu-003": { sessionsBeforeToday: 24, attendedBeforeToday: 18 },
-  "stu-004": { sessionsBeforeToday: 23, attendedBeforeToday: 20 },
-  "stu-005": { sessionsBeforeToday: 24, attendedBeforeToday: 16 },
-};
-
 function storageKey(classId: string) {
-  return "apex.attendance." + classId + ".data.v1";
+  return "apex.attendance." + classId + ".data.v2";
 }
 
 export function loadAttendance(
@@ -34,15 +26,15 @@ export function loadAttendance(
     return roster.map((student) => {
       const existing = byId.get(student.id);
       if (existing) return { ...existing, name: student.name, roll: student.roll };
-      const history = seedHistory[student.id] ?? { sessionsBeforeToday: 0, attendedBeforeToday: 0 };
-      return { id: student.id, name: student.name, roll: student.roll, ...history, today: "absent" };
+      return { id: student.id, name: student.name, roll: student.roll, sessionsBeforeToday: 0, attendedBeforeToday: 0, today: "absent" };
     });
   } catch {
     return roster.map((student) => ({
       id: student.id,
       name: student.name,
       roll: student.roll,
-      ...(seedHistory[student.id] ?? { sessionsBeforeToday: 0, attendedBeforeToday: 0 }),
+      sessionsBeforeToday: 0,
+      attendedBeforeToday: 0,
       today: "absent",
     }));
   }
