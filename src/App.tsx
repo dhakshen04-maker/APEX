@@ -170,32 +170,44 @@ function Attendance({
         <div className="panel table-panel">
           <div className="panel-head">
             <div><p className="eyebrow">TODAY'S RECORD</p><h2>{classId} · Data Structures</h2></div>
-            <span className="pill">Local draft</span>
+            <div className="panel-head-actions">
+              <Button icon="plus" onClick={() => setWorkspace("students")}>Add student</Button>
+              <span className="pill">Local draft</span>
+            </div>
           </div>
           <div className="table-tools">
             <Button variant={filter === "all" ? "primary" : "secondary"} onClick={() => setFilter("all")}>All students</Button>
             <Button variant={filter === "low" ? "primary" : "secondary"} onClick={() => setFilter("low")}>Below 75%</Button>
           </div>
-          <div className="table-wrap">
-            <table>
-              <thead><tr><th>Student</th><th>Roll no.</th><th>Today</th><th>Attendance</th></tr></thead>
-              <tbody>
-                {visible.map((student) => (
-                  <tr key={student.id}>
-                    <td>{student.name}</td>
-                    <td className="muted">{student.roll}</td>
-                    <td><span className={`attendance-state ${student.today}`}>{student.today === "present" ? "Present" : "Absent"}</span></td>
-                    <td>{getAttendancePercentage(student)}%</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          {students.length === 0 ? (
+            <div className="empty-roster">
+              <div className="empty-roster-icon"><Icon name="plus" /></div>
+              <strong>No students added to {classId} yet</strong>
+              <span>Add the students for this class before taking attendance. Their names and roll numbers will appear here automatically.</span>
+              <Button variant="primary" icon="plus" onClick={() => setWorkspace("students")}>Add students</Button>
+            </div>
+          ) : (
+            <div className="table-wrap">
+              <table>
+                <thead><tr><th>Student</th><th>Roll no.</th><th>Today</th><th>Attendance</th></tr></thead>
+                <tbody>
+                  {visible.map((student) => (
+                    <tr key={student.id}>
+                      <td>{student.name}</td>
+                      <td className="muted">{student.roll}</td>
+                      <td><span className={`attendance-state ${student.today}`}>{student.today === "present" ? "Present" : "Absent"}</span></td>
+                      <td>{getAttendancePercentage(student)}%</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
           <div className="data-note">This first functional slice stores attendance locally in this APEX installation. It is not yet connected to a shared database.</div>
         </div>
         <aside className="panel action-panel">
           <p className="eyebrow">ATTENDANCE ACTIONS</p>
-          <Button variant="primary" onClick={() => setEditorOpen(true)}>Mark attendance</Button>
+          <Button variant="primary" onClick={() => students.length ? setEditorOpen(true) : setWorkspace("students")} icon={students.length ? undefined : "plus"}>{students.length ? "Mark attendance" : "Add students"}</Button>
           <Button onClick={() => setWorkspace("qr")} icon="qr">Start QR session</Button>
           <Button onClick={() => setFilter("low")}>Find low-attendance students</Button>
           <Button onClick={() => setWorkspace("reports")} icon="download">Generate report</Button>
@@ -317,7 +329,7 @@ function Students({
     };
     setData(next);
     setConfirmRemove(null);
-    refreshAttendance(selectedClass.id);
+    refreshAttendance(selectedClass.id, next);
   };
 
   const addClass = () => {
