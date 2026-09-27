@@ -281,12 +281,14 @@ function Students({
   selectedClassId,
   setSelectedClassId,
   refreshAttendance,
+  setWorkspace,
 }: {
   data: AcademicData;
   setData: (data: AcademicData) => void;
   selectedClassId: string;
   setSelectedClassId: (classId: string) => void;
   refreshAttendance: (classId: string, dataOverride?: AcademicData) => void;
+  setWorkspace: (workspace: Workspace) => void;
 }) {
   const [name, setName] = useState("");
   const [roll, setRoll] = useState("");
@@ -560,7 +562,7 @@ function EnrollmentQR({ classId, classes, setWorkspace }: { classId: string; cla
 }
 
 function createEnrollmentSession(classId: string) {
-  const token = crypto.randomUUID().replaceAll("-", "").slice(0, 12).toUpperCase();
+  const token = crypto.randomUUID().replace(/-/g, "").slice(0, 12).toUpperCase();
   const expiresAt = Date.now() + 10 * 60 * 1000;
   return {
     classId,
@@ -631,6 +633,7 @@ export default function App() {
           selectedClassId={selectedClassId}
           setSelectedClassId={changeClass}
           refreshAttendance={refreshAttendance}
+          setWorkspace={setWorkspace}
         />
       ) : null}
       {workspace === "spreadsheets" ? <Spreadsheets students={attendanceStudents} /> : null}
