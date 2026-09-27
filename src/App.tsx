@@ -272,7 +272,7 @@ function Students({
   setData: (data: AcademicData) => void;
   selectedClassId: string;
   setSelectedClassId: (classId: string) => void;
-  refreshAttendance: (classId: string) => void;
+  refreshAttendance: (classId: string, dataOverride?: AcademicData) => void;
 }) {
   const [name, setName] = useState("");
   const [roll, setRoll] = useState("");
@@ -307,7 +307,7 @@ function Students({
     setName("");
     setRoll("");
     setConfirmAdd(false);
-    refreshAttendance(selectedClass.id);
+    refreshAttendance(selectedClass.id, next);
   };
 
   const removeStudent = (studentId: string) => {
@@ -515,8 +515,10 @@ export default function App() {
     setAttendanceStudents(loadAttendance(classId, getClassStudents(academicData, classId)));
   };
 
-  const refreshAttendance = (classId: string) => {
-    if (classId === selectedClassId) setAttendanceStudents(loadAttendance(classId, getClassStudents(academicData, classId)));
+  const refreshAttendance = (classId: string, dataOverride?: AcademicData) => {
+    if (classId !== selectedClassId) return;
+    const source = dataOverride ?? academicData;
+    setAttendanceStudents(loadAttendance(classId, getClassStudents(source, classId)));
   };
 
   const updateAcademicData = (data: AcademicData) => {
