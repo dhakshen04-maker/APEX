@@ -4,8 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>APEX Student Enrollment</title>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 <style>
-:root{font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif;color:#eaf3ed;background:#0b120f}*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;background:radial-gradient(circle at 50% 0,#183025 0,#0b120f 48%)}.card{width:min(460px,100%);padding:28px;border:1px solid #294236;border-radius:22px;background:#101a15;box-shadow:0 24px 80px #0008}.brand{font-weight:800;letter-spacing:.18em;font-size:13px}.eyebrow{color:#86a494;font-size:10px;letter-spacing:.16em;margin:22px 0 7px}h1{font-size:28px;margin:0 0 8px}p{color:#93a39a;line-height:1.55;font-size:13px}.class{display:flex;justify-content:space-between;padding:14px;border:1px solid #294236;border-radius:14px;margin:18px 0}.class strong{font-size:18px}label{display:grid;gap:7px;color:#aab9b0;font-size:11px;margin-top:14px}input{width:100%;padding:13px 14px;border-radius:11px;border:1px solid #31473b;background:#0b120f;color:#fff;outline:none}input:focus{border-color:#86a494}button{width:100%;margin-top:18px;padding:13px;border:0;border-radius:11px;background:#dcefe2;color:#0b120f;font-weight:800;cursor:pointer}.status{display:none;margin-top:18px;padding:14px;border-radius:12px;background:#14271c;color:#a8d4b5;font-size:13px}.small{font-size:10px;color:#68786f;text-align:center;margin-top:16px}</style>
+:root{font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif;color:#eaf3ed;background:#0b120f}*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;background:radial-gradient(circle at 50% 0,#183025 0,#0b120f 48%)}.card{width:min(460px,100%);padding:28px;border:1px solid #294236;border-radius:22px;background:#101a15;box-shadow:0 24px 80px #0008}.brand{font-weight:800;letter-spacing:.18em;font-size:13px}.eyebrow{color:#86a494;font-size:10px;letter-spacing:.16em;margin:22px 0 7px}h1{font-size:28px;margin:0 0 8px}p{color:#93a39a;line-height:1.55;font-size:13px}.class{display:flex;justify-content:space-between;padding:14px;border:1px solid #294236;border-radius:14px;margin:18px 0}.class strong{font-size:18px}label{display:grid;gap:7px;color:#aab9b0;font-size:11px;margin-top:14px}input{width:100%;padding:13px 14px;border-radius:11px;border:1px solid #31473b;background:#0b120f;color:#fff;outline:none}input:focus{border-color:#86a494}button{width:100%;margin-top:18px;padding:13px;border:0;border-radius:11px;background:#dcefe2;color:#0b120f;font-weight:800;cursor:pointer}.status{display:none;margin-top:18px;padding:14px;border-radius:12px;background:#14271c;color:#a8d4b5;font-size:13px}.student-qr{display:none;margin-top:20px;padding:18px;border-radius:16px;background:#fff;justify-content:center}.student-qr>div{width:240px;height:240px}.student-qr img,.student-qr canvas{max-width:100%;height:auto}.small{font-size:10px;color:#68786f;text-align:center;margin-top:16px}.error{background:#2a1717;color:#f0aaaa}.success-title{font-size:18px;font-weight:800;margin-bottom:6px;color:#eaf3ed}
+</style>
 </head>
 <body>
 <main class="card">
@@ -17,14 +19,47 @@
 <form id="form">
 <label>Student name<input id="name" required autocomplete="name" placeholder="Enter your full name"></label>
 <label>Roll number / Student ID<input id="roll" required autocomplete="off" placeholder="e.g. 23CSE001"></label>
-<button type="submit">Submit enrollment</button>
+<button type="submit">Continue</button>
 </form>
 <div class="status" id="status"></div>
-<div class="small">APEX · Teacher workspace</div>
+<div class="student-qr" id="studentQr"><div id="qrcode"></div></div>
+<p id="qrHelp" style="display:none;text-align:center">Show this QR to your teacher. APEX will scan it and add you to the selected class.</p>
+<div class="small">APEX · Teacher workspace · Demo enrollment</div>
 </main>
 <script>
-const p=new URLSearchParams(location.search);const cls=p.get('class')||'Unknown class';const token=p.get('token')||'';document.getElementById('className').textContent=cls;
-document.getElementById('form').addEventListener('submit',e=>{e.preventDefault();const name=document.getElementById('name').value.trim();const roll=document.getElementById('roll').value.trim();const request={classId:cls,token,name,roll,createdAt:new Date().toISOString()};const key='apex-enrollment-requests';const old=JSON.parse(localStorage.getItem(key)||'[]');old.push(request);localStorage.setItem(key,JSON.stringify(old));document.getElementById('form').style.display='none';const s=document.getElementById('status');s.style.display='block';s.innerHTML='<strong>Enrollment submitted ✓</strong><br>'+name+' · '+roll+'<br><br>Your teacher can approve this enrollment in APEX.';});
+const params=new URLSearchParams(location.search);
+const cls=params.get('class')||'';
+const token=params.get('token')||'';
+const expires=Number(params.get('expires')||0);
+const className=document.getElementById('className');
+const form=document.getElementById('form');
+const status=document.getElementById('status');
+const studentQr=document.getElementById('studentQr');
+const qrHelp=document.getElementById('qrHelp');
+className.textContent=cls||'Unknown class';
+
+if(!cls||!token||!expires||Date.now()>expires){
+  form.style.display='none';
+  status.style.display='block';
+  status.className='status error';
+  status.innerHTML='<strong>This enrollment QR has expired.</strong><br>Ask your teacher to generate a new QR code.';
+}
+
+form.addEventListener('submit',e=>{
+  e.preventDefault();
+  if(Date.now()>expires){location.reload();return;}
+  const name=document.getElementById('name').value.trim();
+  const roll=document.getElementById('roll').value.trim();
+  if(!name||!roll)return;
+  const payload='APEX_STUDENT|'+JSON.stringify({version:1,classId:cls,token,name,roll});
+  form.style.display='none';
+  status.style.display='block';
+  status.className='status';
+  status.innerHTML='<div class="success-title">Enrollment ready ✓</div>'+name+' · '+roll+'<br><br>Show the QR below to your teacher. The teacher scans it inside APEX to add you to the roster.';
+  studentQr.style.display='flex';
+  qrHelp.style.display='block';
+  new QRCode(document.getElementById('qrcode'),{text:payload,width:240,height:240,colorDark:'#000000',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.M});
+});
 </script>
 </body>
 </html>
