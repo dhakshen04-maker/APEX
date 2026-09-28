@@ -1,54 +1,53 @@
-export type AttendanceIntegrityConfig = {
-  qrRotationSeconds: number;
-  requireFreshVerification: boolean;
-  requireLiveness: boolean;
-  preventDuplicates: boolean;
-  riskFlagging: boolean;
-};
+export type AttendanceRisk = "verified" | "suspicious" | "rejected";
 
-export type AttendanceChallenge = {
-  sessionId: string;
-  classId: string;
-  issuedAt: number;
-  expiresAt: number;
-  nonce: string;
-};
-
-const DEFAULT_CONFIG: AttendanceIntegrityConfig = {
-  qrRotationSeconds: 10,
-  requireFreshVerification: true,
-  requireLiveness: true,
-  preventDuplicates: true,
-  riskFlagging: true,
-};
-
-export function getAttendanceIntegrityConfig(): AttendanceIntegrityConfig {
-  return { ...DEFAULT_CONFIG };
-}
-
-export function createAttendanceChallenge(classId: string, sessionId: string, now = Date.now()): AttendanceChallenge {
-  const nonce = crypto.randomUUID().replaceAll("-", "").slice(0, 24);
-  return { sessionId, classId, issuedAt: now, expiresAt: now + DEFAULT_CONFIG.qrRotationSeconds * 1000, nonce };
-}
-
-export function isChallengeValid(challenge: AttendanceChallenge, now = Date.now()): boolean {
-  return now >= challenge.issuedAt && now < challenge.expiresAt;
-}
-
-export type IntegritySignals = {
+export type AttendanceSignals = {
   qrValid: boolean;
+  qrAgeMs: number;
   authenticated: boolean;
-  freshVerification: boolean;
-  livenessVerified: boolean;
   duplicate: boolean;
-  classroomSignal?: boolean;
+  livePresenceConfirmed: boolean;
+  classroomSignal: "present" | "absent" | "unknown";
 };
 
-export function evaluateIntegrity(signals: IntegritySignals) {
-  const hardFailure = !signals.qrValid || !signals.authenticated || !signals.freshVerification || !signals.livenessVerified || signals.duplicate;
-  const suspicious = !hardFailure && signals.classroomSignal === false;
+export const QR_ROTATION_MS = 10_000;
+export const MAX_QR_AGE_MS = 10_000;
+
+export function evaluateAttendance(signals: AttendanceSignals): { risk: AttendanceRisk; reason: string } {
+  if (!signals.qrValid || signals.qrAgeMs < 0 || signals.qrAgeMs >= MAX_QR_AGE_MS) {
+    return { risk: "rejected", reason: "The attendance QR has expired or is invalid." };
+  }
+  if (signals.duplicate) {
+    return { risk: "rejected", reason: "Attendance has already been recorded for this session." };
+  }
+  if (!signals.authenticated) {
+    return { risk: "rejected", reason: "Student authentication is required." };
+  }
+  if (!signals.livePresenceConfirmed) {
+    return { risk: "rejected", reason: "Live presence was not confirmed by the teacher." };
+  }
+  if (signals.classroomSignal === "absent") {
+    return { risk: "suspicious", reason: "The classroom-presence signal could not be confirmed." };
+  }
+  return { risk: "verified", reason: "Fresh QR, authentication and live-presence checks passed." };
+}
+
+export function createChallengeId(): string {
+  const bytes = new Uint8Array(12);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, b => b.toString(16).padStart(2, "0")).join("");
+}
+
+export function createRotatingQrChallenge(sessionId: string, classId: string, now = Date.now()) {
   return {
-    status: hardFailure ? "rejected" : suspicious ? "suspicious" : "verified",
-    reason: hardFailure ? "Attendance integrity requirements were not satisfied." : suspicious ? "The classroom presence signal could not be confirmed." : "Attendance integrity checks passed.",
-  } as const;
+    version: 2 as const,
+    sessionId,
+    classId,
+    issuedAt: now,
+    expiresAt: now + QR_ROTATION_MS,
+    nonce: createChallengeId(),
+  };
+}
+
+export function isFreshChallenge(createdAt: number, now = Date.now()): boolean {
+  return now >= createdAt && now - createdAt < QR_ROTATION_MS;
 }
