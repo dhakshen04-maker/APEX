@@ -1,98 +1,85 @@
 # APEX
 
-APEX is a teacher-focused AI work assistant for college workflows.
+APEX is a teacher-focused AI work assistant for college workflows, with an expanding institution platform for universities, colleges, and training organizations.
 
-## Initial scope
+## Current product surfaces
 
-- Attendance recording and attendance data management
-- Spreadsheet assistance
-- Student and class/group messaging
-- Reports and summaries
-- Natural-language assistance for teacher workflows
+- **Teacher workspace** — attendance, student/class management, QR enrollment, QR attendance, spreadsheets, messaging, and reports.
+- **Student enrollment** — browser-based QR enrollment flow for adding students to a class roster.
+- **Attendance check-in** — browser-based student check-in flow for teacher-controlled attendance sessions.
+- **Institution console** — institution-level people, academics, security, integrations, and reporting surface.
+- **Enterprise platform preview** — broader modules such as admissions, exams, fees, hostel/transport, library, placements, student support, analytics, identity, and AI-assisted operations.
 
-## Attendance with QR Check-In
+## QR attendance model
 
-APEX will support QR-based attendance as a planned attendance workflow.
+The QR code identifies the **attendance session**, not the student's identity.
 
-### How APEX knows which student scanned
+1. The teacher starts an attendance session for a class.
+2. APEX generates a temporary QR for that session.
+3. The student scans the session QR.
+4. The student is identified through the authenticated student account in a production backend.
+5. APEX associates the Student ID with the Session ID.
+6. The attendance record is saved after validation.
 
-The QR code identifies the **attendance session**, not the individual student.
-
-1. Each student has an APEX account/profile containing their identity information, such as:
-   - Student name
-   - Roll number / Student ID
-   - Class / section
-2. The teacher starts an attendance session in APEX.
-3. APEX generates a temporary QR code for that specific class and session.
-4. A student scans the QR code and opens the APEX check-in page.
-5. The student must be authenticated to their APEX account.
-6. APEX associates the authenticated Student ID with the attendance Session ID.
-7. APEX records that student as present for that session.
-
-Conceptually:
-
-```text
-QR Code
-   ↓
-Attendance Session
-   ↓
-Student scans
-   ↓
-APEX checks authenticated student
-   ↓
-Student ID + Session ID are matched
-   ↓
-Attendance recorded
-```
-
-Example:
-
-```text
-Arun
-CSE-A
-Student ID: 23CSE001
-
-        ↓ scans class QR
-
-APEX Attendance Session
-Data Structures
-27 Sep 2026
-        ↓
-
-23CSE001 → Present
-```
+For the current demo/local-first implementation, the QR flow is designed to demonstrate the complete workflow without requiring a production institution backend.
 
 ### Attendance-session safeguards
 
-The QR workflow should be designed with safeguards so that a shared QR code cannot simply be reused without validation. Planned safeguards include:
+The production design should include:
 
-- Short QR/session expiry
+- Short session expiry
 - One check-in per student per session
 - Authenticated student accounts
 - Class/section validation
 - Optional rotating QR codes
-- Teacher-controlled attendance start/end and session locking
+- Teacher-controlled session start/end
+- Audit logs for attendance changes
 
-### Important design rule
+The QR itself should never be treated as proof of student identity. Identity should come from the authenticated student account.
 
-The QR code itself should **not** be treated as proof of a student's identity. Identity comes from the authenticated student account, while the QR identifies the attendance session.
+## Institution / enterprise scope
 
-The exact authentication, QR format, expiry mechanism, and anti-sharing measures will be finalized after the application stack and backend are verified.
+APEX is being designed as a modular institutional platform rather than only an attendance app. Planned/previewed modules include:
 
-## Project rules
+- Student Information System integration
+- Admissions and onboarding
+- Departments, programs, semesters, subjects, sections and faculty assignment
+- Attendance and low-attendance intervention
+- Exams, assessments and results
+- Timetables and room operations
+- Student/faculty communication
+- Fees and finance integration
+- Hostel and transport operations
+- Library integration
+- Placement/career workflows
+- Mentoring, grievances and student support
+- Institution analytics and reports
+- Role-based access and audit trails
+- Google Workspace / Microsoft Entra identity integration
+- Controlled APEX AI Copilot for staff workflows
+
+See the product surface at `enterprise.html` and the administrator demo at `institution.html`.
+
+## Safety rules
 
 1. Verify repository code, APIs, dependencies, and file paths before making implementation claims.
 2. Do not invent APIs, functions, files, or integrations.
 3. Actions that modify attendance/spreadsheets or send messages must support an explicit confirmation step.
 4. Keep the application modular and suitable for modest hardware.
 5. Treat external repositories as references/components to inspect, not as code to copy blindly.
+6. Production institutional deployment requires authenticated backend services, approved integrations, security review, privacy controls, backup/recovery, and data-retention policies.
 
-## Reference repositories
+## Development
 
-- OpenJarvis: agent and local-first assistant architecture
-- Microsoft JARVIS: task planning and tool/model orchestration
-- MIRA: TypeScript/React/Vite/Tauri desktop assistant foundation
+```bash
+npm install
+npm run build
+npm run dev
+npm run tauri dev
+```
+
+The GitHub Pages workflow builds the web demo on pushes to `main`. A separate quality workflow runs the production TypeScript/Vite build on pushes and pull requests so broken changes are caught before they become the demo build.
 
 ## Current status
 
-Repository initialized. Implementation will proceed incrementally after the architecture and UI requirements are verified.
+The local-first teacher workflow and QR demonstration are functional. The next production phase is the shared authenticated backend and institution integrations. The enterprise UI intentionally separates **demo/preview surfaces** from claims of production data connectivity.
