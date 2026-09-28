@@ -22,6 +22,7 @@ export default defineConfig(() => ({
       input: {
         main: resolve(process.cwd(), "index.html"),
         enroll: resolve(process.cwd(), "enroll.html"),
+        checkin: resolve(process.cwd(), "checkin.html"),
       },
     },
   },
